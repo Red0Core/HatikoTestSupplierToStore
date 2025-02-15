@@ -4,8 +4,9 @@ import re
 
 from csv_processing import find_delimiter
 
-class Product:
-    def __init__(self, name: str, synonyms: set[str], code: str, ram: int | None = None, storage: int | None = None) -> None:
+class StoreProduct:
+    def __init__(self, name: str, synonyms: set[str], code: str,
+                 ram: int | None = None, storage: int | None = None) -> None:
         self.name = name
         self.synonyms = synonyms
         self.code = code
@@ -13,7 +14,8 @@ class Product:
         self.storage = storage
 
     def __repr__(self) -> str:
-        return f"Product({self.name}, synonyms:{self.synonyms})"
+        return f"StoreProduct(name='{self.name}', code='{self.code}', " \
+               f"ram={self.ram}, storage={self.storage}, synonyms={self.synonyms})"
 
 BRAND_SYNONYMS = {
         "xiaomi": ["mi", "redmi", "poco", "сяоми", "ксиаоми"],
@@ -102,7 +104,37 @@ def generate_color_synonyms(path: Path) -> dict[str, set[str]]:
         
         return color_synonyms
 
-def generate_product_synonyms(path: Path) -> list[Product]:
+def generate_keywords(name: str, color_synonyms: dict[str, set[str]], ram: int | None = None, storage: int | None = None, color: str | None = None) -> set:
+    """Генерирует ключевые слова для товара"""
+    keywords = set()
+
+    # Добавляем название модели в разных форматах
+    name = name.lower().strip()
+    keywords.add(name)
+    keywords.add(name.replace(" ", ""))  # Без пробелов
+    keywords.add(name.replace("-", ""))  # Без дефисов
+    keywords.add(name.replace("ё", "е"))
+
+    # Разбиваем название на слова
+    words = name.split()
+    for word in words:
+        keywords.add(word)
+
+    # Добавляем синонимы модели (например, Xiaomi = Mi, Redmi)
+    keywords.update(get_model_synonyms(name))
+
+    if ram:
+        keywords.update(get_memory_synonyms(ram))
+
+    if storage:
+        keywords.update(get_memory_synonyms(storage))
+
+    if color:
+        keywords.update(color_synonyms[color])
+
+    return keywords
+
+def generate_product_synonyms(path: Path) -> list[StoreProduct]:
     """Генерирует синонимы для товаров"""
     delimiter = find_delimiter(path)
     color_synonyms = generate_color_synonyms(path)
@@ -113,38 +145,25 @@ def generate_product_synonyms(path: Path) -> list[Product]:
         ram_index = header.index('Оперативная память (Gb)')
         storage_index = header.index('Встроенная память')
         color_index = header.index('Цвет')
-        products: list[Product] = list()
+        products: list[StoreProduct] = list()
         for row in reader:
             product_name = row[product_index].lower()
             if product_name == '':
                 continue
             
-            product = Product(product_name, set(), row[header.index("Внешний код")])
+            product = StoreProduct(product_name, set(), row[header.index("Внешний код")])
 
-            product.synonyms.add(product_name)
-
-            tokens = product_name.split()
-            for token in tokens:
-                product.synonyms.add(token)
-
-            if 'ё' in product_name:
-                product.synonyms.add(product_name.replace('ё', 'е'))
-
-            # Добавляем синонимы для объема оперативной памяти и цвета и модели
-            product.synonyms.update(get_model_synonyms(product_name))
+            # Добавляем объем оперативной памяти и цвета и модели
             ram = row[ram_index]
             if ram:
                 product.ram = int(ram)
-                product.synonyms.update(get_memory_synonyms(int(ram)))
             color = row[color_index]
-            if color:
-                product.synonyms.update(color_synonyms[color.lower()])
+            color = color.lower() if color else None
 
-            # Добавляем синонимы для объема памяти
+            # Добавляем объем памяти
             storage = row[storage_index]
             if storage:
                 if any(["tb", "тб"] for x in storage.lower()):
-                    product.synonyms.update(get_memory_synonyms(1024))
                     product.storage = 1024
                 else:
                     number = 0
@@ -152,8 +171,9 @@ def generate_product_synonyms(path: Path) -> list[Product]:
                         if not ch.isdigit():
                             number = int(storage[:id])
                             break
-                    product.synonyms.update(get_memory_synonyms(number))
                     product.storage = int(number)
+            # Генерируем ключевые слова через универсальную функцию
+            product.synonyms = generate_keywords(product_name, color_synonyms, product.ram, product.storage, color)
 
             products.append(product)
         return products
