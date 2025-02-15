@@ -5,10 +5,12 @@ import re
 from csv_processing import find_delimiter
 
 class Product:
-    def __init__(self, name: str, synonyms: set[str], code: str) -> None:
+    def __init__(self, name: str, synonyms: set[str], code: str, ram: int | None = None, storage: int | None = None) -> None:
         self.name = name
         self.synonyms = synonyms
         self.code = code
+        self.ram = ram
+        self.storage = storage
 
     def __repr__(self) -> str:
         return f"Product({self.name}, synonyms:{self.synonyms})"
@@ -132,6 +134,7 @@ def generate_product_synonyms(path: Path) -> list[Product]:
             product.synonyms.update(get_model_synonyms(product_name))
             ram = row[ram_index]
             if ram:
+                product.ram = int(ram)
                 product.synonyms.update(get_memory_synonyms(int(ram)))
             color = row[color_index]
             if color:
@@ -142,6 +145,7 @@ def generate_product_synonyms(path: Path) -> list[Product]:
             if storage:
                 if any(["tb", "тб"] for x in storage.lower()):
                     product.synonyms.update(get_memory_synonyms(1024))
+                    product.storage = 1024
                 else:
                     number = 0
                     for id, ch in enumerate(storage):
@@ -149,6 +153,7 @@ def generate_product_synonyms(path: Path) -> list[Product]:
                             number = int(storage[:id])
                             break
                     product.synonyms.update(get_memory_synonyms(number))
+                    product.storage = int(number)
 
             products.append(product)
         return products
