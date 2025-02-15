@@ -12,8 +12,8 @@ def main():
     print('Supplier filename:', filename_supplier)
     print('Store filename:', filename_store)
 
-    for name, synonyms in generate_product_synonyms(Path(filename_store)).items():
-        print(f"Product: {name} -> Synonyms: {synonyms}\n")
+    for product in generate_product_synonyms(Path(filename_store)):
+        print(product, end='\n\n')
 
 if __name__ == '__main__':
     main()

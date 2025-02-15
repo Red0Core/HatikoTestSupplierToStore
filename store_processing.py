@@ -1,7 +1,17 @@
 import csv
 from pathlib import Path
 import re
+
 from csv_processing import find_delimiter
+
+class Product:
+    def __init__(self, name: str, synonyms: set[str], code: str) -> None:
+        self.name = name
+        self.synonyms = synonyms
+        self.code = code
+
+    def __repr__(self) -> str:
+        return f"Product({self.name}, synonyms:{self.synonyms})"
 
 def get_memory_synonyms(ram: int) -> set[str]:
     """Генерирует синонимы для объема памяти"""
@@ -89,7 +99,7 @@ def generate_color_synonyms(path: Path) -> dict[str, set[str]]:
         
         return color_synonyms
 
-def generate_product_synonyms(path: Path) -> dict[str, set[str]]:
+def generate_product_synonyms(path: Path) -> list[Product]:
     """Генерирует синонимы для товаров"""
     delimiter = find_delimiter(path)
     color_synonyms = generate_color_synonyms(path)
@@ -100,43 +110,44 @@ def generate_product_synonyms(path: Path) -> dict[str, set[str]]:
         ram_index = header.index('Оперативная память (Gb)')
         storage_index = header.index('Встроенная память')
         color_index = header.index('Цвет')
-        product_synonyms = {}
+        products: list[Product] = list()
         for row in reader:
             product_name = row[product_index].lower()
             if product_name == '':
                 continue
+            
+            product = Product(product_name, set(), row[header.index("Внешний код")])
 
-            if product_synonyms.get(product_name) is None:
-                product_synonyms[product_name] = set()
-                product_synonyms[product_name].add(product_name)
+            product.synonyms.add(product_name)
 
             tokens = product_name.split()
             for token in tokens:
-                product_synonyms[product_name].add(token)
+                product.synonyms.add(token)
 
             if 'ё' in product_name:
-                product_synonyms[product_name].add(product_name.replace('ё', 'е'))
+                product.synonyms.add(product_name.replace('ё', 'е'))
 
             # Добавляем синонимы для объема оперативной памяти и цвета и модели
-            product_synonyms[product_name].update(get_model_synonyms(product_name))
+            product.synonyms.update(get_model_synonyms(product_name))
             ram = row[ram_index]
             if ram:
-                product_synonyms[product_name].update(get_memory_synonyms(int(ram)))
+                product.synonyms.update(get_memory_synonyms(int(ram)))
             color = row[color_index]
             if color:
-                product_synonyms[product_name].update(color_synonyms[color.lower()])
+                product.synonyms.update(color_synonyms[color.lower()])
 
             # Добавляем синонимы для объема памяти
             storage = row[storage_index]
             if storage:
                 if any(["tb", "тб"] for x in storage.lower()):
-                    product_synonyms[product_name].update(get_memory_synonyms(1024))
+                    product.synonyms.update(get_memory_synonyms(1024))
                 else:
                     number = 0
                     for id, ch in enumerate(storage):
                         if not ch.isdigit():
                             number = int(storage[:id])
                             break
-                    product_synonyms[product_name].update(get_memory_synonyms(number))
+                    product.synonyms.update(get_memory_synonyms(number))
 
-        return product_synonyms
+            products.append(product)
+        return products
