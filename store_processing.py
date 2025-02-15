@@ -13,31 +13,7 @@ class Product:
     def __repr__(self) -> str:
         return f"Product({self.name}, synonyms:{self.synonyms})"
 
-def get_memory_synonyms(ram: int) -> set[str]:
-    """Генерирует синонимы для объема памяти"""
-    synonyms = {f"{ram} gb", f"{ram}гб", f"{ram} гб", f"{ram}gb", ram}
-    if ram == 1024:
-        synonyms.update(["1 tb", "1тб", "1 тб", "1tb"])
-    return synonyms
-
-def get_model_synonyms(model) -> set[str]:
-    """Генерирует синонимы для модели"""
-    model_lower = model.lower()
-    synonyms = set()
-    
-    # Базовое название модели
-    synonyms.add(model_lower)
-    
-    # Упрощённые формы (убираем пробелы, дефисы)
-    synonyms.add(model_lower.replace(" ", ""))
-    synonyms.add(model_lower.replace("-", ""))
-    
-    # Разделяем на слова (чтобы искать по отдельным частям)
-    words = model_lower.split()
-    for word in words:
-        synonyms.add(word)
-
-    base_synonyms = {
+BRAND_SYNONYMS = {
         "xiaomi": ["mi", "redmi", "poco", "сяоми", "ксиаоми"],
         "samsung": ["galaxy", "note", "a", "s", "m", "tab", "самсунг", "гелекси", "гэлэкси"],
         "iphone": ["se", "xr", "x", "xs", "max", "pro", "plus", "айфон"],
@@ -63,7 +39,32 @@ def get_model_synonyms(model) -> set[str]:
         "sony": ["xperia", "сони"],
         "zte": ["red", "magic", "redmagic", "nubia", "neo", "зте"],
     }
-    for brand, models in base_synonyms.items():
+
+def get_memory_synonyms(ram: int) -> set[str]:
+    """Генерирует синонимы для объема памяти"""
+    synonyms = {f"{ram} gb", f"{ram}гб", f"{ram} гб", f"{ram}gb", ram}
+    if ram == 1024:
+        synonyms.update(["1 tb", "1тб", "1 тб", "1tb"])
+    return synonyms
+
+def get_model_synonyms(model) -> set[str]:
+    """Генерирует синонимы для модели"""
+    model_lower = model.lower()
+    synonyms = set()
+    
+    # Базовое название модели
+    synonyms.add(model_lower)
+    
+    # Упрощённые формы (убираем пробелы, дефисы)
+    synonyms.add(model_lower.replace(" ", ""))
+    synonyms.add(model_lower.replace("-", ""))
+    
+    # Разделяем на слова (чтобы искать по отдельным частям)
+    words = model_lower.split()
+    for word in words:
+        synonyms.add(word)
+
+    for brand, models in BRAND_SYNONYMS.items():
         if brand in model_lower:
             for model in models:
                 synonyms.add(model)
