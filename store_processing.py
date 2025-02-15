@@ -163,7 +163,7 @@ def generate_product_synonyms(path: Path) -> list[StoreProduct]:
             # Добавляем объем памяти
             storage = row[storage_index]
             if storage:
-                if any(["tb", "тб"] for x in storage.lower()):
+                if any(x in ["tb", "тб"] for x in storage.lower()):
                     product.storage = 1024
                 else:
                     number = 0
