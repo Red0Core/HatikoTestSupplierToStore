@@ -1,6 +1,7 @@
 import csv
 from pathlib import Path
 import re
+from turtle import color
 
 from csv_processing import find_delimiter
 
@@ -76,44 +77,122 @@ def get_model_synonyms(model) -> set[str]:
     return synonyms
 
 def generate_color_synonyms(path: Path) -> dict[str, set[str]]:
-    """Генерирует синонимы для цветов"""
-    color_regex = re.compile(r"([А-Яа-я]+)\s\((\w+)\)") # Регулярка для Iphone Синий (Blue), получает Blue
+    """Генерирует синонимы для цветов, используя цвет из `Наименование` как основной."""
+    color_regex = re.compile(r"([А-Яа-я\-]+)\s\(([\s\w]+)\)")  # Регулярка для "Темно-Синий (Dark Blue)"
     delimiter = find_delimiter(path)
+
+    # Группы похожих цветов (унификация названий)
+    COLOR_MAPPING = {
+        # Серебро
+        "серебристый": "серебро",
+        "серебряный": "серебро",
+        "серебрянный": "серебро",
+        "silver": "серебро",
+        "platinum": "серебро",
+        "titanium silver": "серебро",
+        "еребристый": "серебро",
+        
+        # Серый
+        "cерый": "серый", # Здесь первая буква английская с, а не русская с
+        "серый космос": "серый",
+        "космос": "серый",
+        "графит": "серый",
+        "графитовый": "серый",
+        "серый": "серый",
+        "титан": "серый",
+        "титановый": "серый",
+        "gray": "серый",
+        "grey": "серый",
+        "graphite": "серый",
+        "space gray": "серый",
+        "titanium gray": "серый",
+
+        # Черный
+        "черный": "черный",
+        "obsidian": "черный",
+        "midnight": "черный",
+        "ночь": "черный",
+        "onyx": "черный",
+
+        # Зеленый
+        "зеленый": "зеленый",
+        "green": "зеленый",
+        "olive": "зеленый",
+
+        # Фиолетовый
+        "фиолетовый": "фиолетовый",
+        "purple": "фиолетовый",
+        "lavender": "фиолетовый",
+        "violet": "фиолетовый",
+
+        # Синий
+        "синий": "синий",
+        "голубой": "синий",
+        "blue": "синий",
+        "navy": "синий",
+        "ультрамарин": "синий",
+    }
 
     with open(path, encoding='utf-8') as fp:
         reader = csv.reader(fp, delimiter=delimiter)
         header = next(reader)
         color_index = header.index('Цвет')
+        name_index = header.index("Наименование")
+
+        # Основной словарь {основной русский цвет → множество синонимов}
         color_synonyms = {}
+
         for row in reader:
-            color_russian = row[color_index].lower()
-            if color_russian == '':
+            name = row[name_index].lower().replace('ё', 'е').replace('-', ' ').strip()
+            color_from_column = row[color_index].lower().replace('ё', 'е').replace('-', ' ').strip() if row[color_index] else None
+
+            # 1Ищем основной цвет в `Наименование`
+            primary_color = None
+            match = color_regex.search(name)
+            if match:
+                primary_color = match.group(1).strip()  # Берём русский цвет
+                english_color = match.group(2).strip()  # Берём английский синоним
+
+            # Если не найдено в `Наименование`, берём из `Цвет`
+            if not primary_color and color_from_column:
+                primary_color = color_from_column
+                english_color = None
+
+            # Если даже `Цвет` пустой, пропускаем строку
+            if not primary_color:
                 continue
 
-            if color_synonyms.get(color_russian) is None:
-                color_synonyms[color_russian] = set()
-                color_synonyms[color_russian].add(color_russian) # Добавляем сам цвет из магазина
+            # Унифицируем цвет (заменяем на стандартный)
+            unified_primary_color = COLOR_MAPPING.get(primary_color, primary_color)
 
-            synonims = color_regex.search(row[header.index("Наименование")].lower())
-            if synonims is not None:
-                for synonim in synonims.groups():
-                    color_synonyms[color_russian].add(synonim)
+            # Создаём группу синонимов
+            if unified_primary_color not in color_synonyms:
+                color_synonyms[unified_primary_color] = set()
+            color_synonyms[unified_primary_color].add(primary_color)  # Сам цвет
 
-            if 'ё' in color_russian:
-                color_synonyms[color_russian].add(color_russian.replace('ё', 'е'))
-        
+            # Добавляем английский цвет (если есть)
+            if english_color:
+                unified_english_color = COLOR_MAPPING.get(english_color, unified_primary_color)
+                color_synonyms[unified_english_color].add(english_color)
+
+            # Добавляем цвет из `Цвет`, если он отличается
+            if color_from_column:
+                unified_column_color = COLOR_MAPPING.get(color_from_column, color_from_column)
+                if unified_column_color != unified_primary_color and unified_column_color not in color_synonyms.keys():  # Если цвет реально другой
+                    color_synonyms[unified_primary_color].add(unified_column_color)
+
         return color_synonyms
+
 
 def generate_keywords(name: str, color_synonyms: dict[str, set[str]], ram: int | None = None, storage: int | None = None, color: str | None = None) -> set:
     """Генерирует ключевые слова для товара"""
     keywords = set()
 
     # Добавляем название модели в разных форматах
-    name = name.lower().strip()
+    name = name.lower().strip().replace("ё", "е")
     keywords.add(name)
     keywords.add(name.replace(" ", ""))  # Без пробелов
     keywords.add(name.replace("-", ""))  # Без дефисов
-    keywords.add(name.replace("ё", "е"))
 
     # Разбиваем название на слова
     words = name.split()
@@ -153,13 +232,26 @@ def generate_product_synonyms(path: Path) -> list[StoreProduct]:
             
             product = StoreProduct(product_name, set(), row[header.index("Внешний код")])
 
-            # Добавляем объем оперативной памяти и цвета и модели
             ram = row[ram_index]
             if ram:
                 product.ram = int(ram)
-            color = row[color_index]
-            color = color.lower() if color else None
 
+            # Получаем цвет из таблицы
+            color_russian = row[color_index]
+            color_russian = color_russian.lower().replace('ё', 'е').replace('-', ' ').strip() if color_russian else None
+            color_english = color_synonyms.get(color_russian, None) if color_russian else None
+            # Проверяем, есть ли цвет в названии товара
+            found_color = None
+            for color in color_synonyms.keys():
+                if color in product_name:
+                    found_color = color
+                    break
+            # Если цвет в столбце "Цвет" не совпадает с названием
+            if color_russian and found_color and color_russian != found_color:
+                print(f"⚠️ Несовпадение цвета в магазине: {product_name} → '{color_russian}' vs '{found_color}'")
+                # Используем цвет из "Наименование", так как он вероятно более точный
+                color = found_color
+            
             # Добавляем объем памяти
             storage = row[storage_index]
             if storage:
