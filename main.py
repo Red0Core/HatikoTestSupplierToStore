@@ -2,7 +2,7 @@ import csv
 from statistics import median
 import sys
 from pathlib import Path
-from store_processing import generate_color_synonyms, generate_product_synonyms
+from store_processing import generate_color_synonyms, load_and_process_store_data
 from supplier_processing import load_and_process_supplier_data
 from matcher import match_supplier_to_store
 
@@ -16,7 +16,7 @@ def main():
     print('Store filename:', filename_store)
 
     color_synonyms = generate_color_synonyms(Path(filename_store))
-    store_products = generate_product_synonyms(Path(filename_store), color_synonyms)
+    store_products = load_and_process_store_data(Path(filename_store), color_synonyms)
     supplier_products = load_and_process_supplier_data(Path(filename_supplier), color_synonyms)
 
     scores = []
@@ -46,7 +46,8 @@ def main():
                 final_table[code] = {"name": name, "prices": []}
 
             # Добавляем цену и поставщика
-            final_table[code]["prices"].append((price, supplier_name))
+            if (price, supplier_name) not in final_table[code]["prices"]:
+                final_table[code]["prices"].append((price, supplier_name))
 
             max_suppliers = max(max_suppliers, len(final_table[code]["prices"]))
             

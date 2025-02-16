@@ -216,7 +216,7 @@ def generate_keywords(name: str, color_synonyms: dict[str, set[str]], ram: int |
 
     return keywords
 
-def generate_product_synonyms(path: Path, color_synonyms) -> list[StoreProduct]:
+def load_and_process_store_data(path: Path, color_synonyms) -> list[StoreProduct]:
     """Генерирует синонимы для товаров"""
     delimiter = find_delimiter(path)
     with open(path, encoding='utf-8') as fp:
