@@ -6,74 +6,62 @@ from turtle import color
 from csv_processing import find_delimiter
 
 class StoreProduct:
-    def __init__(self, name: str, synonyms: set[str], code: str,
-                 ram: int | None = None, storage: int | None = None) -> None:
+    def __init__(self, name: str, brand: str, model: str, synonyms: set[str], code: str, 
+                 ram: int | None = None, storage: int | None = None, color: str | None = None) -> None:
         self.name = name
         self.synonyms = synonyms
         self.code = code
         self.ram = ram
         self.storage = storage
+        self.brand = brand
+        self.model = model
+        self.color = color
 
     def __repr__(self) -> str:
-        return f"StoreProduct(name='{self.name}', code='{self.code}', " \
-               f"ram={self.ram}, storage={self.storage}, synonyms={self.synonyms})"
+        return f"StoreProduct(name='{self.name}', brand='{self.brand}', model='{self.model}', code='{self.code}', " \
+                f"ram={self.ram}, storage={self.storage}, color={self.color}, synonyms={self.synonyms})"
+
+    def __dict__(self) -> dict:
+        return {
+            "name": self.name,
+            "code": self.code,
+            "ram": self.ram,
+            "storage": self.storage,
+            "synonyms": list(self.synonyms),
+            "brand": self.brand,
+            "model": self.model,
+            "brand": self.brand,
+            "color": self.color
+        }
 
 BRAND_SYNONYMS = {
-        "xiaomi": ["mi", "redmi", "poco", "сяоми", "ксиаоми"],
-        "samsung": ["galaxy", "note", "a", "s", "m", "tab", "самсунг", "гелекси", "гэлэкси"],
-        "iphone": ["se", "xr", "x", "xs", "max", "pro", "plus", "айфон"],
-        "ipad": ["pro", "mini", "air", "айпад"],
-        "imac": ["pro", "аймак"],
-        "macbook": ["pro", "air", "макбук"],
-        "apple": ["watch", "airpods", "iphone", "ipad", "macbook", "imac", "эпл", "эппл", "айпад", "айфон", "аймак", "макбук"],
-        "huawei": ["p", "mate", "nova", "y", "pura", "хуавей", "хуавэй"],
-        "microsoft": ["surface", "майкрософт"],
-        "realme": ["c", "narzo", "x", "gt", "реалми", "реалме", "реалмэ", "рилми"],
-        "tecno": ["camon", "spark", "phantom", "текно", "техно"],
-        "vivo": ["y", "v", "x", "iqoo", "виво"],
-        "asus": ["rog", "zenfone", "асус"],
-        "blackview": ["active", "tab", "блэквью"],
-        "google": ["pixel", "tablet", "xl", "гугл"],
-        "honor": ["pad", "magic", "pro", "x", "хонор"],
-        "infinix": ["hot", "note", "zero", "smart", "инфиникс"],
-        "itel": ["a", "vision", "ител"],
-        "motorola": ["moto", "razr", "моторола"],
-        "nothing": ["phone", "cmf", "нотхинг", "нофинг"],
-        "oneplus": ["nord", "pro", "t", "ce", "one", "one+", "ванплюс"],
-        "oppo": ["a", "find", "reno", "oppo"],
-        "sony": ["xperia", "сони"],
-        "zte": ["red", "magic", "redmagic", "nubia", "neo", "зте"],
+        "xiaomi": ["redmi", "poco", "сяоми", "ксиаоми", "xiaomi"],
+        "samsung": ["galaxy", "tab", "самсунг", "гелекси", "гэлэкси", "samsung"],
+        "apple": ["watch", "airpods", "airpodspro", "iphone", "ipad", "macbook", "imac", "эпл", "эппл", "айпад", "айфон", "аймак", "макбук", "apple"],
+        "huawei": ["mate", "nova", "pura", "хуавей", "хуавэй", "huawei"],
+        "microsoft": ["surface", "майкрософт", "microsoft"],
+        "realme": ["narzo", "реалми", "реалме", "реалмэ", "рилми", "realme"],
+        "tecno": ["camon", "spark", "phantom", "текно", "техно", "tecno"],
+        "vivo": ["iqoo", "виво", "vivo"],
+        "asus": ["rog", "zenfone", "асус", "asus"],
+        "blackview": ["active", "блэквью", "blackview"],
+        "google": ["pixel", "tablet", "гугл", "google"],
+        "honor": ["pad", "magic", "хонор", "honor"],
+        "infinix": ["hot", "zero", "smart", "инфиникс", "infinix"],
+        "itel": ["vision", "ител", "itel"],
+        "motorola": ["moto", "razr", "моторола", "motorola"],
+        "nothing": ["phone", "cmf", "нотхинг", "нофинг", "nothing"],
+        "oneplus": ["nord", "one", "one+", "ванплюс", "oneplus"],
+        "oppo": ["find", "reno", "oppo", "оппо"],
+        "sony": ["xperia", "сони", "sony"],
+        "zte": ["magic", "redmagic", "nubia", "зте", "zte"],
     }
 
 def get_memory_synonyms(ram: int) -> set[str]:
     """Генерирует синонимы для объема памяти"""
-    synonyms = {f"{ram} gb", f"{ram}гб", f"{ram} гб", f"{ram}gb", ram}
+    synonyms = {f"{ram} gb", f"{ram}гб", f"{ram} гб", f"{ram}gb", str(ram)}
     if ram == 1024:
         synonyms.update(["1 tb", "1тб", "1 тб", "1tb"])
-    return synonyms
-
-def get_model_synonyms(model) -> set[str]:
-    """Генерирует синонимы для модели"""
-    model_lower = model.lower()
-    synonyms = set()
-    
-    # Базовое название модели
-    synonyms.add(model_lower)
-    
-    # Упрощённые формы (убираем пробелы, дефисы)
-    synonyms.add(model_lower.replace(" ", ""))
-    synonyms.add(model_lower.replace("-", ""))
-    
-    # Разделяем на слова (чтобы искать по отдельным частям)
-    words = model_lower.split()
-    for word in words:
-        synonyms.add(word)
-
-    for brand, models in BRAND_SYNONYMS.items():
-        if brand in model_lower:
-            for model in models:
-                synonyms.add(model)
-
     return synonyms
 
 def generate_color_synonyms(path: Path) -> dict[str, set[str]]:
@@ -146,7 +134,7 @@ def generate_color_synonyms(path: Path) -> dict[str, set[str]]:
             name = row[name_index].lower().replace('ё', 'е').replace('-', ' ').strip()
             color_from_column = row[color_index].lower().replace('ё', 'е').replace('-', ' ').strip() if row[color_index] else None
 
-            # 1Ищем основной цвет в `Наименование`
+            # Ищем основной цвет в `Наименование`
             primary_color = None
             match = color_regex.search(name)
             if match:
@@ -190,17 +178,13 @@ def generate_keywords(name: str, color_synonyms: dict[str, set[str]], ram: int |
 
     # Добавляем название модели в разных форматах
     name = name.lower().strip().replace("ё", "е")
+    name.replace("pro +", "pro+").replace("pro+", "pro plus")  # Приводим к общему виду
     keywords.add(name)
-    keywords.add(name.replace(" ", ""))  # Без пробелов
-    keywords.add(name.replace("-", ""))  # Без дефисов
 
     # Разбиваем название на слова
     words = name.split()
     for word in words:
         keywords.add(word)
-
-    # Добавляем синонимы модели (например, Xiaomi = Mi, Redmi)
-    keywords.update(get_model_synonyms(name))
 
     if ram:
         keywords.update(get_memory_synonyms(ram))
@@ -208,15 +192,33 @@ def generate_keywords(name: str, color_synonyms: dict[str, set[str]], ram: int |
     if storage:
         keywords.update(get_memory_synonyms(storage))
 
+    # Добавляем цвета
     if color:
-        keywords.update(color_synonyms[color])
+        # Добавляем русский цвет
+        keywords.add(color)
+        
+        # Добавляем английский вариант цвета, если они есть в названии
+        for english_color in color_synonyms[color]:
+            # 127 — последний символ ASCII, который не является латинской буквой
+            if ord(english_color[0]) < 128 and english_color.lower() in name:
+                keywords.add(english_color)
+    
+    # Очистим слова, содержащие скобки
+    words_to_update = []
+    for word in keywords:
+        new_word = word.replace("(", "").replace(")", "").strip()
+        if new_word != word:
+            words_to_update.append((word, new_word))
+    
+    for old_word, new_word in words_to_update:
+        keywords.remove(old_word)
+        keywords.add(new_word)
 
     return keywords
 
-def generate_product_synonyms(path: Path) -> list[StoreProduct]:
+def generate_product_synonyms(path: Path, color_synonyms) -> list[StoreProduct]:
     """Генерирует синонимы для товаров"""
     delimiter = find_delimiter(path)
-    color_synonyms = generate_color_synonyms(path)
     with open(path, encoding='utf-8') as fp:
         reader = csv.reader(fp, delimiter=delimiter)
         header = next(reader)
@@ -226,11 +228,23 @@ def generate_product_synonyms(path: Path) -> list[StoreProduct]:
         color_index = header.index('Цвет')
         products: list[StoreProduct] = list()
         for row in reader:
-            product_name = row[product_index].lower()
+            product_name = row[product_index].lower().replace("pro +", "pro+").replace("pro+", "pro plus").replace('-', '')
             if product_name == '':
                 continue
             
-            product = StoreProduct(product_name, set(), row[header.index("Внешний код")])
+            # Условно poco и xiaomi, у них родитель xiaomi, но poco есть в модели
+            brand = row[header.index("Производитель")].lower()
+            model = row[header.index("Модель")].lower().replace("pro +", "pro+").replace("pro+", "pro plus")
+            for orig_brand, variations in BRAND_SYNONYMS.items():
+                if brand in variations:
+                    brand = orig_brand
+            if brand not in model:
+                model = f"{brand} {model}" # Унифицированный формат модели
+            product = StoreProduct(product_name, brand, model, set(), row[header.index("Внешний код")])
+
+            if brand == "xiaomi" and "note" in model and "redmi" not in model:
+                model = model.replace("xiaomi", "xiaomi redmi")  # Автоматически добавляем Redmi, если модель xiaomi note..
+                product_name = product_name.replace("xiaomi", "xiaomi redmi")
 
             ram = row[ram_index]
             if ram:
@@ -239,7 +253,7 @@ def generate_product_synonyms(path: Path) -> list[StoreProduct]:
             # Получаем цвет из таблицы
             color_russian = row[color_index]
             color_russian = color_russian.lower().replace('ё', 'е').replace('-', ' ').strip() if color_russian else None
-            color_english = color_synonyms.get(color_russian, None) if color_russian else None
+
             # Проверяем, есть ли цвет в названии товара
             found_color = None
             for color in color_synonyms.keys():
@@ -248,9 +262,9 @@ def generate_product_synonyms(path: Path) -> list[StoreProduct]:
                     break
             # Если цвет в столбце "Цвет" не совпадает с названием
             if color_russian and found_color and color_russian != found_color:
-                print(f"⚠️ Несовпадение цвета в магазине: {product_name} → '{color_russian}' vs '{found_color}'")
                 # Используем цвет из "Наименование", так как он вероятно более точный
                 color = found_color
+            product.color = color
             
             # Добавляем объем памяти
             storage = row[storage_index]
@@ -264,6 +278,7 @@ def generate_product_synonyms(path: Path) -> list[StoreProduct]:
                             number = int(storage[:id])
                             break
                     product.storage = int(number)
+
             # Генерируем ключевые слова через универсальную функцию
             product.synonyms = generate_keywords(product_name, color_synonyms, product.ram, product.storage, color)
 

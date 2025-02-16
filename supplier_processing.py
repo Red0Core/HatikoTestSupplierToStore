@@ -1,4 +1,6 @@
 import csv
+from locale import normalize
+from os import name
 from pathlib import Path
 import re
 
@@ -6,18 +8,35 @@ from csv_processing import find_delimiter
 from store_processing import BRAND_SYNONYMS, generate_keywords
 
 class SupplierProduct:
-    def __init__(self, model: str, supplier_name: str, synonyms: set[str],
+    def __init__(self, name: str, brand: str, model: str, supplier_name: str, synonyms: set[str],
                  price: int, ram: int | None = None, storage: int | None = None, color: str | None = None):
         self.model = model
         self.supplier_name = supplier_name
         self.price = price
         self.ram = ram
         self.storage = storage
+        self.color = color
+        self.name = name
         self.synonyms = synonyms
+        self.brand = brand
     
     def __repr__(self):
-        return f"SupplierProduct(model='{self.model}', supplier_name='{self.supplier_name}', " \
-               f"price={self.price}, ram={self.ram}, storage={self.storage}, keywords={self.synonyms})"
+        return f"SupplierProduct(name='{self.name}', model='{self.model}', brand='{self.brand}', supplier_name='{self.supplier_name}', " \
+               f"price={self.price}, ram={self.ram}, storage={self.storage}, color={self.color}, synonyms={self.synonyms})"
+    
+    def __dict__(self) -> dict:
+        return {
+            "model": self.model,
+            "supplier_name": self.supplier_name,
+            "price": self.price,
+            "ram": self.ram,
+            "storage": self.storage,
+            "color": self.color,
+            "synonyms": list(self.synonyms),
+            "name": self.name,
+            "brand": self.brand
+        }
+
 
 def extract_brand_or_model(text):
     """
@@ -30,9 +49,10 @@ def extract_brand_or_model(text):
         return match.group(1).strip().lower()
     return None
 
-def normolize_model(model):
-    """Убирает все не ASCII символы из строки"""
-    return ''.join([i if ord(i) < 128 else '' for i in model]).strip(" -")
+def normalize_model(model):
+    """Удаляет не ASCII символы и приводит строку к стандартному виду."""
+    model = re.sub(r"[^\w\s\-/]", "", model)  # Убираем спецсимволы
+    return model.strip()
 
 def extract_price(text: str):
     """Извлекает цену, если она есть в конце строки"""
@@ -47,36 +67,46 @@ def extract_memory(text: str):
     """Убирает объем RAM и Storage из текста"""
     if "tb" in text.lower(): # Меняем терабайты на гигабайты
         text.replace("tb", "024GB").replace("TB", "024GB")
-    match = re.search(r"(\d{1,2})\s?[/\\+\-]\s?(\d{2,4})", text)  # Ищем "8/256", "8+256"
+    match = re.search(r"(\d{1,2})\s?[/\\+\- ]\s?(\d{2,4})[GBgb]*", text)  # Ищем "8/256gb", "8+256GB"
     if match:
         ram = int(match.group(1))
         storage = int(match.group(2))
-        replacer_str = f"{ram}/{str(storage) + 'GB' if storage < 1000 else '1TB'}" # Заменяем на "8/256GB" или "8/1TB"
+        replacer_str = f"{ram}/{str(storage) + "GB" if storage < 1000 else '1TB'}" # Заменяем на "8/256GB" или "8/1TB"
         model = text.replace(match.group(0), replacer_str).strip()
-        return model, ram, storage
-    return text, None, None
-
-def extract_from_color_synonyms_all_english_colors(store_color_synonyms: dict[str, set[str]]) -> set[str]:
-    """Извлекает все английские цвета из словаря магазина"""
-    english_synonyms = set()
-    for synonyms in store_color_synonyms.values():
-        for color in synonyms:
-            if all(ord('a') <= ord(ch) <= ord('z') for ch in color.lower()):
-                english_synonyms.add(color)
-    return english_synonyms
+        return model, replacer_str, ram, storage
+    return text, "", None, None
 
 def map_supplier_color_to_store(supplier_color: str, store_color_synonyms: dict[str, set[str]]) -> str | None:
-    """
-    Ищет английский цвет поставщика в словаре магазина и возвращает его русский эквивалент.
-    Если совпадение не найдено, возвращает None.
-    """
+    """Сопоставляет цвет поставщика со словарем магазина."""""
     supplier_color = supplier_color.lower()
-
     for russian_color, synonyms in store_color_synonyms.items():
         if supplier_color in synonyms:
-            return russian_color  # Возвращаем русский цвет из магазина
+            return russian_color
+    return None
 
-    return None  # Если цвет не найден
+def extract_color(text: str, store_color_synonyms: dict[str, set[str]]) -> tuple[str, str | None]:
+    """Ищет цвет в названии и приводит его к стандартному формату магазина."""
+    for russian_color, synonyms in store_color_synonyms.items():
+        # В приоритете более длинные цвета, так как black и black stormy могут быть в тексте
+        sorted_synonyms = sorted(synonyms, key=len, reverse=True)
+        for color in sorted_synonyms:
+            if color in text.lower():
+                return text.lower().replace(color, "").strip(), russian_color
+    return text, None
+
+def normalize_brand(brand: str) -> str:
+    """Приводит бренд к стандартному написанию из BRAND_SYNONYMS."""
+    for key_brand, variations in BRAND_SYNONYMS.items():
+        if brand in variations:
+            return key_brand
+    return brand
+
+def detect_brand_from_model(model: str) -> str | None:
+    """Определяет бренд из модели, используя BRAND_SYNONYMS."""
+    for brand in BRAND_SYNONYMS:
+        if brand in model:
+            return brand
+    return None  # Если бренд не найден
 
 def load_and_process_supplier_data(file_path, store_color_synonyms):
     """
@@ -88,52 +118,68 @@ def load_and_process_supplier_data(file_path, store_color_synonyms):
     delimeter = find_delimiter(file_path)
     supplier_data: list[SupplierProduct] = []
     current_brand = None
-    all_english_colors = extract_from_color_synonyms_all_english_colors(store_color_synonyms)
     with open(file_path, encoding="utf-8") as f:
         reader = csv.reader(f, delimiter=delimeter)
         for row in reader:
             if len(row) < 2:
                 continue
 
-            product_name = row[0].strip().lower()
-            supplier_name = row[1].strip().lower()
+            product_name = row[0].strip().lower().replace("pro + ", "pro+ ").replace("pro+ ", "pro plus ").replace('-','')
+            supplier_name = row[1].strip()
 
             # Проверяем, является ли строка заголовком бренда
             match = extract_brand_or_model(product_name)
             if match:
-                current_brand = match  # Запоминаем бренд
+                current_brand = normalize_brand(match)  # Запоминаем бренд
                 continue
+            
+            detected_brand = detect_brand_from_model(product_name)
+
+            # Если модель уже содержит какой-то бренд, используем его как `current_brand`
+            if detected_brand:
+                current_brand = detected_brand
 
             # Извлекаем цену
             model, price = extract_price(product_name)
 
-            if price is None:
+            if price is None or '[' in model:
                 continue  # Пропускаем мусор
 
-            # Извлекаем RAM и Storage
-            model, ram, storage = extract_memory(model)
+            # Извлекаем RAM и Storage и приводит к единому формату
+            model, replace_ram_storage, ram, storage = extract_memory(model)
+            product_name = model # Обновляем название товара к унифицированному
+            model = model.replace(replace_ram_storage, "")  # Убираем RAM и Storage из модели
+            # Отделяем цвет (если есть)
+            model, supplier_color = extract_color(model, store_color_synonyms)
 
-            # Извлекаем цвет (если есть)
-            supplier_color = None
-            for color in all_english_colors:
-                if color in model.lower():
-                    supplier_color = color
-                    break
+            # Очищаем модель и имя
+            model = normalize_model(model)
+            product_name = normalize_model(product_name)
 
-            # Приводим цвет к русскому варианту из магазина
-            store_color = map_supplier_color_to_store(supplier_color, store_color_synonyms) if supplier_color else None
+            # Если бренд найден ранее, добавляем его к модели при условии, что в имени нет любого другого бренда
+            if current_brand:
+                for orig_brand, variations in BRAND_SYNONYMS.items():
+                    if current_brand in variations:
+                        current_brand = orig_brand
+                        break
 
-            # Очищаем модель
-            model = normolize_model(model)
+                if current_brand not in model:
+                    model = f"{current_brand} {model}"
+                if current_brand not in product_name:
+                    product_name = f"{current_brand} {product_name}"
 
-            # Если бренд найден ранее, добавляем его к модели
-            if current_brand and not any(brand in model for brand in BRAND_SYNONYMS):
-                model = f"{current_brand} {model}"
+            if current_brand == "xiaomi" and "note" in model and "redmi" not in model:
+                model = model.replace("xiaomi", "xiaomi redmi")  # Автоматически добавляем Redmi, если модель xiaomi note..
+                product_name = product_name.replace("xiaomi", "xiaomi redmi")
+
+            product_name = ' '.join(product_name.split()) # Убираем лишние пробелы
+            model = ' '.join(model.split()) # Убираем лишние пробелы
 
             # Генерируем ключевые слова
-            keywords = generate_keywords(model, store_color_synonyms, ram, storage, store_color)
+            keywords = generate_keywords(product_name, store_color_synonyms, ram, storage, supplier_color)
 
             # Добавляем обработанный товар
-            supplier_data.append(SupplierProduct(model, supplier_name, keywords, price, ram, storage, store_color))
+            supplier_data.append(SupplierProduct(product_name, current_brand, model,
+                                                 supplier_name, keywords, price, ram, storage, supplier_color))
 
     return supplier_data
