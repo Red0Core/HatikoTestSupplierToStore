@@ -37,13 +37,13 @@ def main():
             supplier_product = matched.supplier_product
 
             code = store_product.code
-            name = store_product.name
+            orig_name = store_product.orig_name
             price = supplier_product.price
             supplier_name = supplier_product.supplier_name
 
             # Если товара еще нет в таблице - создаем
             if code not in final_table:
-                final_table[code] = {"name": name, "prices": []}
+                final_table[code] = {"orig_name": orig_name, "prices": []}
 
             # Добавляем цену и поставщика
             if (price, supplier_name) not in final_table[code]["prices"]:
@@ -61,7 +61,7 @@ def main():
 
     # Заполняем строки CSV
     for code, data in final_table.items():
-        row = [code, data["name"]]
+        row = [code, data["orig_name"]]
         
         # Сортируем цены от меньшей к большей
         sorted_prices = sorted(data["prices"], key=lambda x: x[0])

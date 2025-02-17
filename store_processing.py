@@ -6,8 +6,9 @@ from turtle import color
 from csv_processing import find_delimiter
 
 class StoreProduct:
-    def __init__(self, name: str, brand: str, model: str, synonyms: set[str], code: str, 
+    def __init__(self, orig_name: str, name: str, brand: str, model: str, synonyms: set[str], code: str,
                  ram: int | None = None, storage: int | None = None, color: str | None = None) -> None:
+        self.orig_name = orig_name
         self.name = name
         self.synonyms = synonyms
         self.code = code
@@ -18,11 +19,13 @@ class StoreProduct:
         self.color = color
 
     def __repr__(self) -> str:
-        return f"StoreProduct(name='{self.name}', brand='{self.brand}', model='{self.model}', code='{self.code}', " \
-                f"ram={self.ram}, storage={self.storage}, color={self.color}, synonyms={self.synonyms})"
+        return f"StoreProduct(orig_name='{self.orig_name}', name='{self.name}', brand='{self.brand}'," \
+               f"model='{self.model}', code='{self.code}', ram={self.ram}, storage={self.storage}, " \
+               f"color={self.color}, synonyms={self.synonyms})"
 
     def __dict__(self) -> dict:
         return {
+            "orig_name": self.orig_name,
             "name": self.name,
             "code": self.code,
             "ram": self.ram,
@@ -228,6 +231,7 @@ def load_and_process_store_data(path: Path, color_synonyms) -> list[StoreProduct
         color_index = header.index('Цвет')
         products: list[StoreProduct] = list()
         for row in reader:
+            orig_name = row[product_index]
             product_name = row[product_index].lower().replace("pro +", "pro+").replace("pro+", "pro plus").replace('-', '')
             if product_name == '':
                 continue
@@ -240,7 +244,7 @@ def load_and_process_store_data(path: Path, color_synonyms) -> list[StoreProduct
                     brand = orig_brand
             if brand not in model:
                 model = f"{brand} {model}" # Унифицированный формат модели
-            product = StoreProduct(product_name, brand, model, set(), row[header.index("Внешний код")])
+            product = StoreProduct(orig_name, product_name, brand, model, set(), row[header.index("Внешний код")])
 
             if brand == "xiaomi" and "note" in model and "redmi" not in model:
                 model = model.replace("xiaomi", "xiaomi redmi")  # Автоматически добавляем Redmi, если модель xiaomi note..
